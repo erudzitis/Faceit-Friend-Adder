@@ -1,5 +1,6 @@
 import requests
 import json
+from selenium import webdriver
 
 class FACEITAPI:
     def __init__(self, API_KEY, WEB_API_KEY, MY_FACEIT_ID):
@@ -13,6 +14,11 @@ class FACEITAPI:
         
         self.API_HEADERS = {"Authorization": "Bearer {}".format(self.API_KEY)}
         self.WEB_HEADERS = {"Authorization": "Bearer {}".format(self.WEB_API_KEY), "Origin": "https://api.faceit.com", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.0.0 Safari/537.36", "faceit-referer": "new-frontend", "Referer": "https://api.faceit.com/proxy.html"}
+
+        self.scrapeData()
+
+    def scrapeData(self):
+        pass      
 
     def getLiveMatches(self, limit, offset):
         request = requests.get(self.LIVE_MATCHES_BASE_URL.format(limit = limit, offset = offset), headers = self.WEB_HEADERS)
