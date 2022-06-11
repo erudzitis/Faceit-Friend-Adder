@@ -2,6 +2,8 @@ import PySimpleGUI as pysg
 import pycountry
 import os
 import json
+import run
+import datetime
 
 # Country exception converter
 countryConverter = {
@@ -15,7 +17,8 @@ FACEITLOGO = b"iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAgAElEQVR4nN19Sa8ly
 WORKING_DIRECTORY_PATH = os.path.dirname(os.path.realpath(__file__))
 
 if not os.path.exists(WORKING_DIRECTORY_PATH + "\config.json"):
-    open("config.json", "w").close()
+    with open("config.json", "w") as config:
+        config.write("{}")
 
 
 # UI definitions
@@ -28,25 +31,30 @@ menuDef = [["Config", ["Save", "Load"]]]
 
 SettingLayoutColum = [
     [pysg.InputText(key="-CHROMEDRIVERPATH-+"), pysg.FileBrowse(file_types=(("Executable", "*.exe"),))],
+    [pysg.Input(enable_events=True, expand_x=True, key="-CHROMEPROFILEPATH-+")]
 ]
 
 MainLayoutColumn = [
+    [pysg.Input(enable_events=True, expand_x=True, key="-ELOFROM-+")],
+    [pysg.Input(enable_events=True, expand_x=True, key="-ELOTO-+")],
     [pysg.Input(enable_events=True, expand_x=True, key="-MINIMUMINVENTORYVALUE-+")],
     [pysg.Input(enable_events=True, expand_x=True, key="-FACEITLIVEMATCHLIMIT-+")],
     [pysg.Input(enable_events=True, expand_x=True, key="-TARGETUSERCOUNTRYLIST-+")],
+    [pysg.Checkbox("Faceit membership required", key="-FACEITMEMBERSHIPREQUIRED-+")],
     [pysg.Button("Start", expand_x=True, key="-STARTFACEITADDER-")]
 ]
 
 OutputLayoutColumn = [
-    [pysg.Multiline(size=(1, 5), expand_x=True, disabled=True, autoscroll=True, key="-OUTPUTLOG-")],
-    [pysg.ProgressBar(max_value=1, size=(1, 20), expand_x=True, key="-OUTPUTPROGRESS-")]
+    [pysg.Multiline("Log of added users will be displayed here...", size=(1, 5), font=("Calibri", 8), expand_x=True, autoscroll=True, key="-OUTPUTLOG-")],
+    [pysg.ProgressBar(max_value=1, size=(1, 20), expand_x=True, key="-OUTPUTPROGRESS-")],
+    [pysg.Text("Expected time remaining: ", key="-TIMEREMAINING-")]
 ]
 
 UILayout = [
     [pysg.Menu(menuDef, background_color="white", font=("Segoe UI", 10))],
 
     [pysg.Frame("Dependencies", element_justification="left", expand_x=True, relief="groove", layout=SettingLayoutColum)],
-    [pysg.Frame("Application options", element_justification="center", expand_x=True, relief="groove", layout=MainLayoutColumn)],
+    [pysg.Frame("Application options", element_justification="left", expand_x=True, relief="groove", layout=MainLayoutColumn)],
     [pysg.Frame("Output", element_justification="center", expand_x=True, visible=False, relief="groove", layout=OutputLayoutColumn, key="-OUTPUTFRAME-")],
 ]
 
@@ -65,6 +73,7 @@ def handlePlaceholder(widget, action):
 
 def initPlaceholder(widget, placeholderText):
     placeholderStorage[widget.key] = placeholderText
+    widget.set_tooltip(placeholderText)
 
     if widget.get() == "":
         widget.update(placeholderText)
@@ -77,9 +86,12 @@ def initPlaceholder(widget, placeholderText):
 FAUI = pysg.Window(title="Faceit Adder", layout=UILayout, element_justification="center", finalize=True)
 
 initPlaceholder(FAUI["-CHROMEDRIVERPATH-+"], "Path to chrome driver executable")
+initPlaceholder(FAUI["-CHROMEPROFILEPATH-+"], "Path to chrome profile")
+initPlaceholder(FAUI["-ELOFROM-+"], "Minimum elo")
+initPlaceholder(FAUI["-ELOTO-+"], "Maximum elo")
 initPlaceholder(FAUI["-MINIMUMINVENTORYVALUE-+"], "Minimum inventory value")
 initPlaceholder(FAUI["-FACEITLIVEMATCHLIMIT-+"], "Faceit live match search limit")
-initPlaceholder(FAUI["-TARGETUSERCOUNTRYLIST-+"], "Specific target country (if left blank, no countries will be excluded)")
+initPlaceholder(FAUI["-TARGETUSERCOUNTRYLIST-+"], "Exluded countries")
 
 # test
 import random
@@ -137,19 +149,43 @@ while True:
 
             try:
                 data = pycountry.countries.get(name=country)
-                updatedCountryAbbrevations.append(data.alpha_2)
+                updatedCountryAbbrevations.append(data.alpha_2.lower())
             except: 
                 continue
             
-        #FAUI["-TARGETUSERCOUNTRYLIST-+"].update(",".join(updatedCountryAbbrevations))
-        FAUI["-OUTPUTFRAME-"].update(visible=True)
-        FAUI["-OUTPUTPROGRESS-"].max_value = len(largeList)
-
         # Running functionality
-        for index, element in enumerate(largeList):
-            event, values = FAUI.read(10)
+        APPLICATION_INSTANCE = run.Application(FAUI["-ELOFROM-+"].get(), FAUI["-ELOTO-+"].get(), FAUI["-FACEITMEMBERSHIPREQUIRED-+"].get(), FAUI["-MINIMUMINVENTORYVALUE-+"].get(), FAUI["-FACEITLIVEMATCHLIMIT-+"].get(), updatedCountryAbbrevations, FAUI["-CHROMEDRIVERPATH-+"].get(), FAUI["-CHROMEPROFILEPATH-+"].get())
+        players = APPLICATION_INSTANCE.getPlayerCollection()
 
+        # Updating output visibility
+        FAUI["-OUTPUTFRAME-"].update(visible=True)
+        # Updating initial progress bar state
+        FAUI["-OUTPUTPROGRESS-"].max_value = len(players)
+
+        for index, player in enumerate(players):
+            # Throttling update to every 4 seconds
+            event, values = FAUI.read(4000)
+
+            # Fetching inventory value
+            inventoryValue = APPLICATION_INSTANCE.playerInventoryValue(player["steam_id"])
+
+            # Updating progress bar, time remaining
             FAUI["-OUTPUTPROGRESS-"].update(max=FAUI["-OUTPUTPROGRESS-"].max_value, current_count=index)
+
+            secondsExpectedRemaining = (FAUI["-OUTPUTPROGRESS-"].max_value - index) * 4
+            FAUI["-TIMEREMAINING-"].update("Expected time remaining: {}".format(datetime.timedelta(seconds=secondsExpectedRemaining)))
+
+            # Checking for a match
+            if (not APPLICATION_INSTANCE.playerInventoryMatch(inventoryValue)):
+                continue
+
+            # Sending friend request
+            APPLICATION_INSTANCE.playerFriendRequest(player["faceit_id"])
+
+            # Outputting data to user
+            output = "{}, elo: {}, inventory price {}".format(player["faceit_url"], player["faceit_elo"], inventoryValue)
+
+            FAUI["-OUTPUTLOG-"].update(FAUI["-OUTPUTLOG-"].get() + "\n" + output)
 
 
 FAUI.close()

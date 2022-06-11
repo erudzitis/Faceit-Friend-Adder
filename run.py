@@ -1,58 +1,34 @@
-# init
-from dotenv import load_dotenv
-load_dotenv()
 
 import faceitapi
 import lolzapi
-import colors
-import os
-from ratelimit import limits, sleep_and_retry
 
 class Application:
-    def __init__(self, FAUI_INVENTORY_VALUE, FAUI_LIVE_MATCH_LIMIT, FAUI_TARGET_COUNTRY_LIST):
-        self.FAUI_INVENTORY_VALUE = FAUI_INVENTORY_VALUE
-        self.FAUI_LIVE_MATCH_LIMIT = FAUI_LIVE_MATCH_LIMIT
+    def __init__(self, FAUI_ELO_FROM, FAUI_ELO_TO, FAUI_MEMBERSHIP_REQUIRED, FAUI_INVENTORY_VALUE, FAUI_LIVE_MATCH_LIMIT, FAUI_TARGET_COUNTRY_LIST, FAUI_CHROME_DRIVER_PATH, FAUI_CHROME_PROFILE_PATH):
+        self.FAUI_ELO_FROM = int(FAUI_ELO_FROM)
+        self.FAUI_ELO_TO = int(FAUI_ELO_TO)
+        self.FAUI_MEMBERSHIP_REQUIRED = FAUI_MEMBERSHIP_REQUIRED
+        self.FAUI_INVENTORY_VALUE = int(FAUI_INVENTORY_VALUE)
+        self.FAUI_LIVE_MATCH_LIMIT = int(FAUI_LIVE_MATCH_LIMIT)
         self.FAUI_TARGET_COUNTRY_LIST = FAUI_TARGET_COUNTRY_LIST
+        self.FAUI_CHROME_DRIVER_PATH = FAUI_CHROME_DRIVER_PATH
+        self.FAUI_CHROME_PROFILE_PATH = FAUI_CHROME_PROFILE_PATH
 
-        self.FACEITAPIINSTANCE = faceitapi.FACEITAPI(os.getenv("FACEITAPI_AUTHORIZATION"), os.getenv("FACEITUSER_AUTHORIZATION"), os.getenv("FACEIT_ID"))
-        
+        self.FACEITAPIINSTANCE = faceitapi.FACEITAPI("3ef86a93-cd01-4b5e-b79b-7f255107e8d4", self.FAUI_TARGET_COUNTRY_LIST, self.FAUI_CHROME_DRIVER_PATH, self.FAUI_CHROME_PROFILE_PATH)
+        self.LOLZAPIINSTANCE = lolzapi.LOLZAPI("eur", self.FAUI_CHROME_DRIVER_PATH, self.FAUI_CHROME_PROFILE_PATH)
 
-# API instances
-faceitApiInstance = faceitapi.FACEITAPI(os.getenv("FACEITAPI_AUTHORIZATION"), os.getenv("FACEITUSER_AUTHORIZATION"), os.getenv("FACEIT_ID"))
-lolzApiInstance = lolzapi.LOLZAPI("eur", os.getenv("LOLZ__xfToken"))
-colorsInstance = colors.COLORS()
+    def getPlayerCollection(self):
+        # Getting ongoing matche
+       ongoingMatches = self.FACEITAPIINSTANCE.getLiveMatches(self.FAUI_LIVE_MATCH_LIMIT, 0)
+       # Converting data recieved and filtering it to our requirements [payload, eloFrom, eloTo, membershipRequired]
+       ongoingMatchPlayers = self.FACEITAPIINSTANCE.collectLiveMatchesData(ongoingMatches["payload"], self.FAUI_ELO_FROM, self.FAUI_ELO_TO, self.FAUI_MEMBERSHIP_REQUIRED)
 
-# Globals
-REQUIRED_USER_INVENTORY_PRICE = float(os.getenv("USER_INVENTORY_PRICE"))
-LIVE_MATCH_LIMIT = int(os.getenv("FACEIT_LIVE_MATCH_SEARCH_LIMIT"))
+       return ongoingMatchPlayers
 
-# Methods
-@sleep_and_retry
-@limits(calls=1, period=4)
-def requestThrottler():
-    return
+    def playerInventoryValue(self, steamId):
+        return self.LOLZAPIINSTANCE.getInventoryPrice(steamId)
 
-def runScript(targetCountries):
-    # print("{c}[FACEIT-ADDER-SCRIPT] Fetching ongoing live matches...".format(c = colorsInstance.WARNING))
-    ongoingMatches = faceitApiInstance.getLiveMatches(LIVE_MATCH_LIMIT, 0) # Getting ongoing matches
-    
-    # print("{c}[FACEIT-ADDER-SCRIPT] Converting and filtering data...".format(c = colorsInstance.WARNING))
-    ongoingMatchPlayers = faceitApiInstance.collectLiveMatchesData(ongoingMatches["payload"], 1000, 3000, False) # Converting data recieved and filtering it to our requirements [payload, eloFrom, eloTo, membershipRequired]
+    def playerInventoryMatch(self, price):
+        return price >= self.FAUI_INVENTORY_VALUE
 
-    # print("{c}[FACEIT-ADDER-SCRIPT] Starting to process collected players...".format(c = colorsInstance.WARNING))
-    for player in ongoingMatchPlayers:
-        # Throttling request to lolz team web api to 10 second intervals
-        requestThrottler()
-        playerInventoryPrice = lolzApiInstance.getInventoryPrice(player["steam_id"])
-        matchFound = playerInventoryPrice >= REQUIRED_USER_INVENTORY_PRICE
-
-        # print("{c}[FACEIT-ADDER-SCRIPT] {faceit_url}, elo: {faceit_elo}, inventory price {inventory_price}".format(c = colorsInstance.OKGREEN if matchFound else colorsInstance.FAIL, faceit_url = player["faceit_url"], faceit_elo = player["faceit_elo"], inventory_price = playerInventoryPrice))
-
-        if (not matchFound):
-            continue
-
-        # print("{c}[FACEIT-ADDER-SCRIPT] Adding player...".format(c = colorsInstance.OKGREEN))
-        addPlayer = faceitApiInstance.addFriend(player["faceit_id"])
-
-""" if (__name__ == "__main__"):
-    runScript() """
+    def playerFriendRequest(self, faceitId):
+        self.FACEITAPIINSTANCE.addFriend(faceitId)
