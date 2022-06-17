@@ -47,7 +47,7 @@ MainLayoutColumn = [
 OutputLayoutColumn = [
     [pysg.Multiline("Log of added users will be displayed here...", size=(1, 5), font=("Calibri", 8), expand_x=True, autoscroll=True, key="-OUTPUTLOG-")],
     [pysg.ProgressBar(max_value=1, size=(1, 20), expand_x=True, key="-OUTPUTPROGRESS-")],
-    [pysg.Text("Expected time remaining: ", key="-TIMEREMAINING-")]
+    [pysg.Text("Expected time remaining: ", font=("Calibri", 10), key="-TIMEREMAINING-")]
 ]
 
 UILayout = [
@@ -170,9 +170,9 @@ while True:
             inventoryValue = APPLICATION_INSTANCE.playerInventoryValue(player["steam_id"])
 
             # Updating progress bar, time remaining
-            FAUI["-OUTPUTPROGRESS-"].update(max=FAUI["-OUTPUTPROGRESS-"].max_value, current_count=index)
+            FAUI["-OUTPUTPROGRESS-"].update(max=FAUI["-OUTPUTPROGRESS-"].max_value, current_count=(index + 1))
 
-            secondsExpectedRemaining = (FAUI["-OUTPUTPROGRESS-"].max_value - index) * 4
+            secondsExpectedRemaining = (FAUI["-OUTPUTPROGRESS-"].max_value - (index + 1)) * 4
             FAUI["-TIMEREMAINING-"].update("Expected time remaining: {}".format(datetime.timedelta(seconds=secondsExpectedRemaining)))
 
             # Checking for a match
