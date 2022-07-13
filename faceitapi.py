@@ -24,6 +24,7 @@ class FACEITAPI:
     def scrapeData(self):
         chromeOptions = Options()
         chromeOptions.add_argument(r"user-data-dir={}".format(self.PROFILE_PATH))
+        chromeOptions.binary_location = "C:\Program Files\Google\Chrome Beta\Application\chrome.exe"
 
         driver = webdriver.Chrome(executable_path=r"{}".format(self.DRIVER_PATH), options=chromeOptions)
         driver.get("https://www.faceit.com/") 

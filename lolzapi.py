@@ -23,6 +23,7 @@ class LOLZAPI:
     def scrapeData(self):
         chromeOptions = Options()
         chromeOptions.add_argument(r"user-data-dir={}".format(self.profilePath))
+        chromeOptions.binary_location = "C:\Program Files\Google\Chrome Beta\Application\chrome.exe"
 
         driver = webdriver.Chrome(executable_path=r"{}".format(self.driverPath), options=chromeOptions)
         driver.get(self.BASE_DOMAIN_URL + "market")
